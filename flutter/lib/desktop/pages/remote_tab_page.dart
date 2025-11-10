@@ -64,6 +64,8 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
     _display = display as int?;
     tryMoveToScreenAndSetFullscreen(screenRect);
     if (peerId != null) {
+      final initialTitle = params['windowTitle'] as String?;
+      rustDeskWinManager.setCustomWindowTitle(peerId!, initialTitle);
       ConnectionTypeState.init(peerId!);
       tabController.onSelected = (id) {
         final remotePage = tabController.widget(id);
@@ -77,7 +79,7 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
       };
       tabController.add(TabInfo(
         key: peerId!,
-        label: peerId!,
+        label: rustDeskWinManager.customWindowTitle(peerId!) ?? peerId!,
         selectedIcon: selectedIcon,
         unselectedIcon: unselectedIcon,
         onTabCloseButton: () => tabController.closeBy(peerId),
@@ -360,6 +362,7 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
       loopCloseWindow();
     }
     ConnectionTypeState.delete(id);
+    rustDeskWinManager.setCustomWindowTitle(id, null);
     _update_remote_count();
   }
 
@@ -406,6 +409,10 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
       final displays = args['displays'];
       final screenRect = parseParamScreenRect(args);
       final prePeerCount = tabController.length;
+      final windowTitle = args['windowTitle'] as String?;
+      if (id != null) {
+        rustDeskWinManager.setCustomWindowTitle(id, windowTitle);
+      }
       Future.delayed(Duration.zero, () async {
         if (stateGlobal.fullscreen.isTrue) {
           await WindowController.fromWindowId(windowId()).setFullscreen(false);
@@ -420,7 +427,7 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
       ConnectionTypeState.init(id);
       tabController.add(TabInfo(
         key: id,
-        label: id,
+        label: rustDeskWinManager.customWindowTitle(id) ?? id,
         selectedIcon: selectedIcon,
         unselectedIcon: unselectedIcon,
         onTabCloseButton: () => tabController.closeBy(id),

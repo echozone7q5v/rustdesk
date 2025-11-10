@@ -46,6 +46,7 @@ fn main() {
     let args = format!(
         "-p, --port-forward=[PORT-FORWARD-OPTIONS] 'Format: remote-id:local-port:remote-port[:remote-host]'
         -c, --connect=[REMOTE_ID] 'test only'
+        -t, --title=[TITLE] 'Custom window title'
         -k, --key=[KEY] ''
        -s, --server=[] 'Start server'",
     );
