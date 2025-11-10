@@ -677,7 +677,7 @@ fn import_config(path: &str) {
 fn core_main_invoke_new_connection(mut args: std::env::Args) -> Option<Vec<String>> {
     let mut authority = None;
     let mut id = None;
-    let mut param_array = vec![];
+    let mut param_pairs: Vec<(String, String)> = Vec::new();
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--connect" | "--play" | "--file-transfer" | "--view-camera" | "--port-forward"
@@ -687,16 +687,21 @@ fn core_main_invoke_new_connection(mut args: std::env::Args) -> Option<Vec<Strin
             }
             "--password" => {
                 if let Some(password) = args.next() {
-                    param_array.push(format!("password={password}"));
+                    param_pairs.push(("password".to_owned(), password));
                 }
             }
             "--relay" => {
-                param_array.push(format!("relay=true"));
+                param_pairs.push(("relay".to_owned(), "true".to_owned()));
             }
             // inner
             "--switch_uuid" => {
                 if let Some(switch_uuid) = args.next() {
-                    param_array.push(format!("switch_uuid={switch_uuid}"));
+                    param_pairs.push(("switch_uuid".to_owned(), switch_uuid));
+                }
+            }
+            "--title" => {
+                if let Some(title) = args.next() {
+                    param_pairs.push(("title".to_owned(), title));
                 }
             }
             _ => {}
@@ -710,16 +715,17 @@ fn core_main_invoke_new_connection(mut args: std::env::Args) -> Option<Vec<Strin
             if id.ends_with(&ext) {
                 id = id.replace(&ext, "");
             }
-            let params = param_array.join("&");
-            let params_flag = if params.is_empty() { "" } else { "?" };
-            uni_links = format!(
-                "{}{}/{}{}{}",
-                crate::get_uri_prefix(),
-                authority,
-                id,
-                params_flag,
-                params
-            );
+            let params = if param_pairs.is_empty() {
+                String::new()
+            } else {
+                let mut serializer =
+                    url::form_urlencoded::Serializer::new(String::new());
+                for (key, value) in param_pairs {
+                    serializer.append_pair(&key, &value);
+                }
+                format!("?{}", serializer.finish())
+            };
+            uni_links = format!("{}{}/{}{}", crate::get_uri_prefix(), authority, id, params);
         }
     }
     if uni_links.is_empty() {

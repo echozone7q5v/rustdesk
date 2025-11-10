@@ -2242,6 +2242,7 @@ bool handleUriLink({List<String>? cmdArgs, Uri? uri, String? uriString}) {
   String? password;
   String? switchUuid;
   bool? forceRelay;
+  String? windowTitle;
   for (int i = 0; i < args.length; i++) {
     switch (args[i]) {
       case '--connect':
@@ -2292,6 +2293,12 @@ bool handleUriLink({List<String>? cmdArgs, Uri? uri, String? uriString}) {
       case '--relay':
         forceRelay = true;
         break;
+      case '--title':
+        if (i + 1 < args.length) {
+          windowTitle = args[i + 1];
+          i++;
+        }
+        break;
       default:
         break;
     }
@@ -2303,37 +2310,48 @@ bool handleUriLink({List<String>? cmdArgs, Uri? uri, String? uriString}) {
           rustDeskWinManager.newRemoteDesktop(id!,
               password: password,
               switchUuid: switchUuid,
-              forceRelay: forceRelay);
+              forceRelay: forceRelay,
+              windowTitle: windowTitle);
         });
         break;
       case UriLinkType.fileTransfer:
         Future.delayed(Duration.zero, () {
           rustDeskWinManager.newFileTransfer(id!,
-              password: password, forceRelay: forceRelay);
+              password: password,
+              forceRelay: forceRelay,
+              windowTitle: windowTitle);
         });
         break;
       case UriLinkType.viewCamera:
         Future.delayed(Duration.zero, () {
           rustDeskWinManager.newViewCamera(id!,
-              password: password, forceRelay: forceRelay);
+              password: password,
+              forceRelay: forceRelay,
+              windowTitle: windowTitle);
         });
         break;
       case UriLinkType.portForward:
         Future.delayed(Duration.zero, () {
           rustDeskWinManager.newPortForward(id!, false,
-              password: password, forceRelay: forceRelay);
+              password: password,
+              forceRelay: forceRelay,
+              windowTitle: windowTitle);
         });
         break;
       case UriLinkType.rdp:
         Future.delayed(Duration.zero, () {
           rustDeskWinManager.newPortForward(id!, true,
-              password: password, forceRelay: forceRelay);
+              password: password,
+              forceRelay: forceRelay,
+              windowTitle: windowTitle);
         });
         break;
       case UriLinkType.terminal:
         Future.delayed(Duration.zero, () {
           rustDeskWinManager.newTerminal(id!,
-              password: password, forceRelay: forceRelay);
+              password: password,
+              forceRelay: forceRelay,
+              windowTitle: windowTitle);
         });
         break;
     }
@@ -2445,6 +2463,8 @@ List<String>? urlLinkToCmdArgs(Uri uri) {
     if (password != null) args.addAll(['--password', password]);
     String? switch_uuid = param["switch_uuid"];
     if (switch_uuid != null) args.addAll(['--switch_uuid', switch_uuid]);
+    String? title = param["title"];
+    if (title != null) args.addAll(['--title', title]);
     if (param["relay"] != null) args.add("--relay");
     return args;
   }
@@ -2927,8 +2947,14 @@ String getWindowName({WindowType? overrideType}) {
   return name;
 }
 
-String getWindowNameWithId(String id, {WindowType? overrideType}) {
-  return "${DesktopTab.tablabelGetter(id).value} - ${getWindowName(overrideType: overrideType)}";
+String getWindowNameWithId(String id,
+    {WindowType? overrideType, String? titleOverride}) {
+  final override = titleOverride?.trim();
+  final label = (override != null && override.isNotEmpty)
+      ? override
+      : (rustDeskWinManager.customWindowTitle(id) ??
+          DesktopTab.tablabelGetter(id).value);
+  return "$label - ${getWindowName(overrideType: overrideType)}";
 }
 
 Future<void> updateSystemWindowTheme() async {

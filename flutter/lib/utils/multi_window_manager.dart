@@ -65,6 +65,20 @@ class RustDeskMultiWindowManager {
   final List<int> _viewCameraWindows = List.empty(growable: true);
   final List<int> _portForwardWindows = List.empty(growable: true);
   final List<int> _terminalWindows = List.empty(growable: true);
+  final Map<String, String> _customWindowTitles = {};
+
+  void setCustomWindowTitle(String remoteId, String? title) {
+    final trimmed = title?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      _customWindowTitles.remove(remoteId);
+    } else {
+      _customWindowTitles[remoteId] = trimmed;
+    }
+  }
+
+  String? customWindowTitle(String remoteId) {
+    return _customWindowTitles[remoteId];
+  }
 
   moveTabToNewWindow(int windowId, String peerId, String sessionId,
       WindowType windowType) async {
@@ -75,6 +89,10 @@ class RustDeskMultiWindowManager {
       'session_id': sessionId,
     };
     if (windowType == WindowType.RemoteDesktop) {
+      final title = customWindowTitle(peerId);
+      if (title != null) {
+        params['windowTitle'] = title;
+      }
       await _newSession(
         false,
         WindowType.RemoteDesktop,
@@ -82,6 +100,7 @@ class RustDeskMultiWindowManager {
         peerId,
         _remoteDesktopWindows,
         jsonEncode(params),
+        windowTitle: title,
       );
     } else if (windowType == WindowType.ViewCamera) {
       await _newSession(
@@ -133,6 +152,13 @@ class RustDeskMultiWindowManager {
         'b': screenRect.bottom,
       };
     }
+    String? windowTitle;
+    if (!isCamera) {
+      windowTitle = customWindowTitle(peerId);
+      if (windowTitle != null) {
+        params['windowTitle'] = windowTitle;
+      }
+    }
     await _newSession(
       false,
       windowType.windowType,
@@ -141,57 +167,60 @@ class RustDeskMultiWindowManager {
       windowIDs,
       jsonEncode(params),
       screenRect: screenRect,
+      windowTitle: windowTitle,
     );
   }
 
-  Future<int> newSessionWindow(
-    WindowType type,
-    String remoteId,
-    String msg,
-    List<int> windows,
-    bool withScreenRect,
-  ) async {
-    final windowController = await DesktopMultiWindow.createWindow(msg);
-    if (isWindows) {
-      windowController.setInitBackgroundColor(Colors.black);
-    }
-    final windowId = windowController.windowId;
-    if (!withScreenRect) {
-      windowController
-        ..setFrame(const Offset(0, 0) &
-            Size(1280 + windowId * 20, 720 + windowId * 20))
-        ..center()
-        ..setTitle(getWindowNameWithId(
-          remoteId,
-          overrideType: type,
-        ));
-    } else {
-      windowController.setTitle(getWindowNameWithId(
+    Future<int> newSessionWindow(
+      WindowType type,
+      String remoteId,
+      String msg,
+      List<int> windows,
+      bool withScreenRect, {
+      String? windowTitle,
+    }) async {
+      final windowController = await DesktopMultiWindow.createWindow(msg);
+      if (isWindows) {
+        windowController.setInitBackgroundColor(Colors.black);
+      }
+      final windowId = windowController.windowId;
+      final computedTitle = getWindowNameWithId(
         remoteId,
         overrideType: type,
-      ));
+        titleOverride: windowTitle,
+      );
+      if (!withScreenRect) {
+        windowController
+          ..setFrame(const Offset(0, 0) &
+              Size(1280 + windowId * 20, 720 + windowId * 20))
+          ..center()
+          ..setTitle(computedTitle);
+      } else {
+        windowController.setTitle(computedTitle);
+      }
+      if (isMacOS) {
+        Future.microtask(() => windowController.show());
+      }
+      registerActiveWindow(windowId);
+      windows.add(windowId);
+      return windowId;
     }
-    if (isMacOS) {
-      Future.microtask(() => windowController.show());
-    }
-    registerActiveWindow(windowId);
-    windows.add(windowId);
-    return windowId;
-  }
 
-  Future<MultiWindowCallResult> _newSession(
-    bool openInTabs,
-    WindowType type,
-    String methodName,
-    String remoteId,
-    List<int> windows,
-    String msg, {
-    Rect? screenRect,
-  }) async {
+    Future<MultiWindowCallResult> _newSession(
+      bool openInTabs,
+      WindowType type,
+      String methodName,
+      String remoteId,
+      List<int> windows,
+      String msg, {
+      Rect? screenRect,
+      String? windowTitle,
+    }) async {
     if (openInTabs) {
       if (windows.isEmpty) {
         final windowId = await newSessionWindow(
-            type, remoteId, msg, windows, screenRect != null);
+              type, remoteId, msg, windows, screenRect != null,
+              windowTitle: windowTitle);
         return MultiWindowCallResult(windowId, null);
       } else {
         return call(type, methodName, msg);
@@ -214,7 +243,8 @@ class RustDeskMultiWindowManager {
         }
       }
       final windowId = await newSessionWindow(
-          type, remoteId, msg, windows, screenRect != null);
+            type, remoteId, msg, windows, screenRect != null,
+            windowTitle: windowTitle);
       return MultiWindowCallResult(windowId, null);
     }
   }
@@ -230,6 +260,7 @@ class RustDeskMultiWindowManager {
     bool? isRDP,
     bool? isSharedPassword,
     String? connToken,
+    String? windowTitle,
   }) async {
     var params = {
       "type": type.index,
@@ -249,6 +280,11 @@ class RustDeskMultiWindowManager {
     if (connToken != null) {
       params['connToken'] = connToken;
     }
+    setCustomWindowTitle(remoteId, windowTitle);
+    final trimmedTitle = windowTitle?.trim();
+    if (trimmedTitle != null && trimmedTitle.isNotEmpty) {
+      params['windowTitle'] = trimmedTitle;
+    }
     final msg = jsonEncode(params);
 
     // separate window for file transfer is not supported
@@ -264,7 +300,8 @@ class RustDeskMultiWindowManager {
       }
     }
 
-    return _newSession(openInTabs, type, methodName, remoteId, windows, msg);
+    return _newSession(openInTabs, type, methodName, remoteId, windows, msg,
+        windowTitle: trimmedTitle);
   }
 
   Future<MultiWindowCallResult> newRemoteDesktop(
@@ -273,6 +310,7 @@ class RustDeskMultiWindowManager {
     bool? isSharedPassword,
     String? switchUuid,
     bool? forceRelay,
+    String? windowTitle,
   }) async {
     return await newSession(
       WindowType.RemoteDesktop,
@@ -283,6 +321,7 @@ class RustDeskMultiWindowManager {
       forceRelay: forceRelay,
       switchUuid: switchUuid,
       isSharedPassword: isSharedPassword,
+      windowTitle: windowTitle,
     );
   }
 
@@ -292,6 +331,7 @@ class RustDeskMultiWindowManager {
     bool? isSharedPassword,
     bool? forceRelay,
     String? connToken,
+    String? windowTitle,
   }) async {
     return await newSession(
       WindowType.FileTransfer,
@@ -302,6 +342,7 @@ class RustDeskMultiWindowManager {
       forceRelay: forceRelay,
       isSharedPassword: isSharedPassword,
       connToken: connToken,
+      windowTitle: windowTitle,
     );
   }
 
@@ -312,6 +353,7 @@ class RustDeskMultiWindowManager {
     String? switchUuid,
     bool? forceRelay,
     String? connToken,
+    String? windowTitle,
   }) async {
     return await newSession(
       WindowType.ViewCamera,
@@ -323,6 +365,7 @@ class RustDeskMultiWindowManager {
       switchUuid: switchUuid,
       isSharedPassword: isSharedPassword,
       connToken: connToken,
+      windowTitle: windowTitle,
     );
   }
 
@@ -333,6 +376,7 @@ class RustDeskMultiWindowManager {
     bool? isSharedPassword,
     bool? forceRelay,
     String? connToken,
+    String? windowTitle,
   }) async {
     return await newSession(
       WindowType.PortForward,
@@ -344,6 +388,7 @@ class RustDeskMultiWindowManager {
       isRDP: isRDP,
       isSharedPassword: isSharedPassword,
       connToken: connToken,
+      windowTitle: windowTitle,
     );
   }
 
@@ -353,7 +398,11 @@ class RustDeskMultiWindowManager {
     bool? isSharedPassword,
     bool? forceRelay,
     String? connToken,
+    String? windowTitle,
   }) async {
+    setCustomWindowTitle(remoteId, windowTitle);
+    final trimmedTitle = windowTitle?.trim();
+
     // Iterate through terminal windows in reverse order to prioritize
     // the most recently added or used windows, as they are more likely
     // to have an active session.
@@ -375,11 +424,15 @@ class RustDeskMultiWindowManager {
       "isSharedPassword": isSharedPassword,
       "connToken": connToken,
     };
+    if (trimmedTitle != null && trimmedTitle.isNotEmpty) {
+      params['windowTitle'] = trimmedTitle;
+    }
     final msg = jsonEncode(params);
 
     // Always create a new window for terminal
     final windowId = await newSessionWindow(
-        WindowType.Terminal, remoteId, msg, _terminalWindows, false);
+        WindowType.Terminal, remoteId, msg, _terminalWindows, false,
+        windowTitle: trimmedTitle);
     return MultiWindowCallResult(windowId, null);
   }
 
