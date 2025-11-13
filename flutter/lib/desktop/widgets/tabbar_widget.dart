@@ -1360,14 +1360,18 @@ class _TabDropDownButtonState extends State<_TabDropDownButton> {
           context: context,
           position: position,
           items: sortedKeys.map((e) {
-            var label = e;
             final tabInfo = widget.controller.state.value.tabs
                 .firstWhereOrNull((element) => element.key == e);
-            if (tabInfo != null) {
-              label = tabInfo.label;
-            }
-            if (widget.labelGetter != null) {
-              label = widget.labelGetter!(e).value;
+            final customTitle = rustDeskWinManager.customWindowTitle(e);
+            var label = customTitle?.trim();
+            if (label == null || label.isEmpty) {
+              if (widget.labelGetter != null) {
+                label = widget.labelGetter!(e).value;
+              } else if (tabInfo != null) {
+                label = tabInfo.label;
+              } else {
+                label = e;
+              }
             }
             var index = widget.controller.state.value.tabs
                 .indexWhere((t) => t.key == e);
