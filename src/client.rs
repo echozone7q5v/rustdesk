@@ -3629,6 +3629,12 @@ pub trait Interface: Send + Clone + 'static + Sized {
         self.get_lch().write().unwrap().received = received;
     }
 
+    /// Reconnect to the remote peer.
+    /// Default implementation does nothing, should be overridden by implementations that support reconnection.
+    fn reconnect(&self, _force_relay: bool) {
+        // Default: do nothing
+    }
+
     fn on_establish_connection_error(&self, err: String) {
         let title = "Connection Error";
         let text = err.to_string();
@@ -3651,6 +3657,17 @@ pub trait Interface: Send + Clone + 'static + Sized {
             if !received {
                 relay_hint_type = "relay-hint2"
             }
+        }
+
+        // Check if we can auto-retry without showing error dialog
+        let retry_for_relay = direct == Some(true) && !received;
+        let can_auto_retry = check_if_retry("error", title, &text, retry_for_relay);
+        
+        if can_auto_retry {
+            // Auto-retry without showing error dialog
+            log::info!("Auto-retrying connection for error: {}", err);
+            self.reconnect(false);
+            return;
         }
 
         // relay-hint

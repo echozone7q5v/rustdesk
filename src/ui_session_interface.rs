@@ -1753,6 +1753,10 @@ impl<T: InvokeUiSession> Interface for Session<T> {
         self.ui_handler.msgbox(msgtype, title, text, link, retry);
     }
 
+    fn reconnect(&self, force_relay: bool) {
+        ClientHandler::reconnect(self, force_relay);
+    }
+
     fn handle_login_error(&self, err: &str) -> bool {
         handle_login_error(self.lc.clone(), err, self)
     }
