@@ -182,19 +182,66 @@ jobs:
           name: topmostwindow-artifacts
           path: "./rustdesk"
 
+      - name: Get version
+        id: get_version
+        shell: bash
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | sed 's/version = "\(.*\)"/\1/' | tr -d ' ')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Build self-extracted executable
+        shell: bash
+        run: |
+          # Remove dpiAware from manifest.xml if exists
+          if [ -f res/manifest.xml ]; then
+            sed -i '/dpiAware/d' res/manifest.xml || true
+          fi
+          
+          # Build portable packer
+          pushd ./libs/portable
+          pip3 install -r requirements.txt
+          python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/rustdesk.exe
+          popd
+          
+          # Check if portable packer was built successfully
+          if [ -f "./target/release/rustdesk-portable-packer.exe" ]; then
+            # Get version for filename
+            VERSION="${{ steps.get_version.outputs.version }}"
+            if [ -z "$VERSION" ]; then
+              VERSION="dev"
+            fi
+            mkdir -p ./Output
+            mv ./target/release/rustdesk-portable-packer.exe ./Output/rustdesk-$VERSION-x86_64-install.exe
+            echo "Self-extracted executable created: rustdesk-$VERSION-x86_64-install.exe"
+          else
+            echo "Error: rustdesk-portable-packer.exe was not created"
+            exit 1
+          fi
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@master
         with:
           name: rustdesk-windows-x64-dev
-          path: rustdesk
+          path: |
+            Output/rustdesk-*-x86_64-install.exe
+            rustdesk
 
       - name: Show build summary
         run: |
           Write-Host "Build completed successfully!"
-          Write-Host "Executable location: rustdesk/rustdesk.exe"
+          $exeFiles = Get-ChildItem -Path "Output" -Filter "rustdesk-*-x86_64-install.exe" -ErrorAction SilentlyContinue
+          if ($exeFiles) {
+            $exeFile = $exeFiles[0]
+            Write-Host "Installation file: $($exeFile.Name)"
+            Write-Host "File size: $([math]::Round($exeFile.Length / 1MB, 2)) MB"
+            Write-Host "Build date: $($exeFile.LastWriteTime)"
+          } else {
+            Write-Host "Warning: Installation file not found in Output directory"
+          }
           if (Test-Path "rustdesk/rustdesk.exe") {
             $fileInfo = Get-Item "rustdesk/rustdesk.exe"
-            Write-Host "File size: $($fileInfo.Length / 1MB) MB"
-            Write-Host "Build date: $($fileInfo.LastWriteTime)"
+            Write-Host "Executable location: rustdesk/rustdesk.exe"
+            Write-Host "File size: $([math]::Round($fileInfo.Length / 1MB, 2)) MB"
           }
 
