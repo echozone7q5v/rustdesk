@@ -1754,7 +1754,7 @@ impl<T: InvokeUiSession> Interface for Session<T> {
     }
 
     fn reconnect(&self, force_relay: bool) {
-        ClientHandler::reconnect(self, force_relay);
+        Session::reconnect(self, force_relay);
     }
 
     fn handle_login_error(&self, err: &str) -> bool {
