@@ -2947,13 +2947,22 @@ String getWindowName({WindowType? overrideType}) {
   return name;
 }
 
+String getHumanReadableRemoteLabel(String id, {String? titleOverride}) {
+  final override = titleOverride?.trim();
+  if (override != null && override.isNotEmpty) {
+    return override;
+  }
+  final custom = rustDeskWinManager.customWindowTitle(id);
+  if (custom != null && custom.trim().isNotEmpty) {
+    return custom.trim();
+  }
+  // Fallback to existing desktop tab label logic (alias/hostname/id)
+  return DesktopTab.tablabelGetter(id).value;
+}
+
 String getWindowNameWithId(String id,
     {WindowType? overrideType, String? titleOverride}) {
-  final override = titleOverride?.trim();
-  final label = (override != null && override.isNotEmpty)
-      ? override
-      : (rustDeskWinManager.customWindowTitle(id) ??
-          DesktopTab.tablabelGetter(id).value);
+  final label = getHumanReadableRemoteLabel(id, titleOverride: titleOverride);
   return "$label - ${getWindowName(overrideType: overrideType)}";
 }
 

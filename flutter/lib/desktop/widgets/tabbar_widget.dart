@@ -279,8 +279,8 @@ class DesktopTab extends StatefulWidget {
   }) : super(key: key);
 
   static RxString tablabelGetter(String peerId) {
-    final alias = bind.mainGetPeerOptionSync(id: peerId, key: 'alias');
-    return RxString(getDesktopTabLabel(peerId, alias));
+    // Use unified helper to resolve human-readable remote label
+    return RxString(getHumanReadableRemoteLabel(peerId));
   }
 
   @override
@@ -328,8 +328,8 @@ class _DesktopTabState extends State<DesktopTab>
   _DesktopTabState() : super();
 
   static RxString tablabelGetter(String peerId) {
-    final alias = bind.mainGetPeerOptionSync(id: peerId, key: 'alias');
-    return RxString(getDesktopTabLabel(peerId, alias));
+    // Use unified helper to resolve human-readable remote label
+    return RxString(getHumanReadableRemoteLabel(peerId));
   }
 
   @override
@@ -1362,20 +1362,11 @@ class _TabDropDownButtonState extends State<_TabDropDownButton> {
           items: sortedKeys.map((e) {
             final tabInfo = widget.controller.state.value.tabs
                 .firstWhereOrNull((element) => element.key == e);
-            final customTitle = rustDeskWinManager.customWindowTitle(e);
-            var label = customTitle?.trim();
-            if (label == null || label.isEmpty) {
-              if (widget.labelGetter != null) {
-                label = widget.labelGetter!(e).value;
-              } else if (tabInfo != null) {
-                label = tabInfo.label;
-              } else {
-                label = e;
-              }
-            }
+            // Use unified helper to resolve human-readable remote label for dropdown
+            var baseLabel = getHumanReadableRemoteLabel(e);
             var index = widget.controller.state.value.tabs
                 .indexWhere((t) => t.key == e);
-            label = '${index + 1}. $label';
+            var label = '${index + 1}. $baseLabel';
             final menuHover = false.obs;
             final btnHover = false.obs;
             return PopupMenuItem<String>(

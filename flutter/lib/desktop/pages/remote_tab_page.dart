@@ -79,7 +79,8 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
       };
       tabController.add(TabInfo(
         key: peerId!,
-        label: rustDeskWinManager.customWindowTitle(peerId!) ?? peerId!,
+        // Use peerId as label key; actual display label is resolved by labelGetter
+        label: peerId!,
         selectedIcon: selectedIcon,
         unselectedIcon: unselectedIcon,
         onTabCloseButton: () => tabController.closeBy(peerId),
@@ -427,7 +428,8 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
       ConnectionTypeState.init(id);
       tabController.add(TabInfo(
         key: id,
-        label: rustDeskWinManager.customWindowTitle(id) ?? id,
+        // Use id as label key; actual display label is resolved by labelGetter
+        label: id,
         selectedIcon: selectedIcon,
         unselectedIcon: unselectedIcon,
         onTabCloseButton: () => tabController.closeBy(id),
